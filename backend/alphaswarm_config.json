@@ -16,7 +16,7 @@
   "budget_warning_threshold": 50,
   "budget_hard_floor": 5,
   "default_depth": "deep",
-  "default_focus": "all",
+  "default_mode": "standard",
   "compound_searches_override": -1,
   "phase1_enabled": true,
   "phase2_cross_exam_enabled": true,

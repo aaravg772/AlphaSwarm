@@ -49,6 +49,8 @@ def _backfill_memo_scores(data: dict[str, Any]) -> dict[str, Any]:
     memo = data.get("memo") or {}
     if not memo:
         return data
+    if (memo.get("mode") or data.get("mode") or "standard").lower() == "research":
+        return data
     subs = memo.get("subscores") if isinstance(memo.get("subscores"), dict) else {}
     required = [
         "financial_health",
@@ -75,8 +77,8 @@ def _backfill_memo_scores(data: dict[str, Any]) -> dict[str, Any]:
 
 class StartResearchRequest(BaseModel):
     target: str = Field(min_length=1)
+    mode: str = "standard"
     depth: str = "standard"
-    focus: str = "all-around"
     specific_questions: str = ""
     context: str = ""
     agent_ids: list[str] = []
@@ -113,6 +115,18 @@ async def startup() -> None:
 @app.middleware("http")
 async def api_log_middleware(request: Request, call_next):
     response = await call_next(request)
+    path = request.url.path or ""
+    content_type = (response.headers.get("content-type") or "").lower()
+    if (
+        path == "/"
+        or path.startswith("/frontend/")
+        or "text/html" in content_type
+        or "javascript" in content_type
+        or "text/css" in content_type
+    ):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
     logger.log_api(f"{request.method} {request.url.path} -> {response.status_code}")
     return response
 

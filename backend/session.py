@@ -37,6 +37,7 @@ def list_sessions() -> list[dict[str, Any]]:
                 {
                     "session_id": data.get("session_id"),
                     "target": data.get("target"),
+                    "mode": data.get("mode", "standard"),
                     "created_at": data.get("created_at"),
                     "status": data.get("status"),
                     "depth": data.get("depth", "standard"),

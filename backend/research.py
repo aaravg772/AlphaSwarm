@@ -25,6 +25,7 @@ from .hallucination_guard import (
 from .logger import logger
 from .memo import (
     apply_depth_metadata,
+    build_research_mode_memo,
     cap_investment_action,
     derive_subscores_from_agents,
     enforce_bear_thesis,
@@ -276,10 +277,12 @@ class ResearchManager:
     async def start_session(self, payload: dict[str, Any]) -> dict[str, Any]:
         refresh_depth_config()
         depth = (payload.get("depth") or cfg.default_depth).lower()
-        focus = (payload.get("focus") or cfg.default_focus or "all-around").lower()
+        mode = (payload.get("mode") or cfg.default_mode or "standard").lower()
+        if mode not in {"standard", "research"}:
+            mode = "standard"
         custom_agent_ids = payload.get("agent_ids") or []
         force_refresh = bool(payload.get("force_refresh", False))
-        agent_ids = resolve_agent_ids(depth, focus, custom_agent_ids)
+        agent_ids = resolve_agent_ids(depth, custom_agent_ids)
         required_calls = get_depth_required_calls(depth, custom_agent_ids) if cfg.phase1_enabled else 0
         target = payload.get("target", "")
         target_validation = await asyncio.to_thread(validate_target, target)
@@ -297,7 +300,7 @@ class ResearchManager:
             "updated_at": datetime.now(timezone.utc).isoformat(),
             "target": target,
             "depth": depth,
-            "focus": focus,
+            "mode": mode,
             "context": (payload.get("context") or "")[: cfg.max_context_chars],
             "specific_questions": payload.get("specific_questions") or "",
             "status": "running",
@@ -333,7 +336,7 @@ class ResearchManager:
         )
 
         logger.log_phase(f"━━━ Phase 1: Research | Target: {target} | {len(agent_ids)} agents ━━━")
-        asyncio.create_task(self.run_research(session_id, target, depth, focus, session["context"], agent_ids, force_refresh=force_refresh))
+        asyncio.create_task(self.run_research(session_id, target, depth, session["context"], agent_ids, force_refresh=force_refresh))
         return {"session_id": session_id, "required_compound_calls": required_calls}
 
     async def _save(self, session_id: str) -> None:
@@ -347,12 +350,10 @@ class ResearchManager:
         session_id: str,
         target: str,
         depth: str,
-        focus: str,
         context: str,
         agent_ids: list[str],
         force_refresh: bool = False,
     ) -> None:
-        del focus
         try:
             session = await self.get_status(session_id)
             target_validation = (session or {}).get("target_validation", {})
@@ -615,6 +616,7 @@ class ResearchManager:
         session = await self.get_status(session_id)
         if not session:
             return
+        mode = (session.get("mode") or "standard").lower()
 
         session["phase"] = 4
         session["phase_name"] = PHASE_NAMES[4]
@@ -680,25 +682,35 @@ class ResearchManager:
             f"total={total_prompt_chars}ch (~{total_prompt_chars//4} tokens)"
         )
 
-        result = await asyncio.to_thread(
-            self.groq.instant_analysis,
-            purpose="synthesis",
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            session_id=session_id,
-        )
-        session["total_tokens_in"] += int(result["token_in"])
-        session["total_tokens_out"] += int(result["token_out"])
+        if mode == "research":
+            memo = build_research_mode_memo(
+                target=target,
+                depth=depth,
+                agent_ids=agent_ids,
+                agent_results=session["agent_results"],
+                cross_exam_notes=session.get("cross_exam_notes", []),
+                technical_analysis=session.get("technical_analysis"),
+            )
+        else:
+            result = await asyncio.to_thread(
+                self.groq.instant_analysis,
+                purpose="synthesis",
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                session_id=session_id,
+            )
+            session["total_tokens_in"] += int(result["token_in"])
+            session["total_tokens_out"] += int(result["token_out"])
 
-        memo = parse_memo_json(result["text"], target, agent_ids=agent_ids)
-        memo = derive_subscores_from_agents(memo, session["agent_results"])
-        memo = enforce_score_scale(memo)
-        memo = enforce_bear_thesis(memo)
-        memo["majority_raw"] = majority_raw
-        memo["majority_weighted"] = majority_weighted
-        memo["agents_positive"] = pos
-        memo["agents_negative"] = neg
-        memo["agents_neutral"] = neu
+            memo = parse_memo_json(result["text"], target, agent_ids=agent_ids)
+            memo = derive_subscores_from_agents(memo, session["agent_results"])
+            memo = enforce_score_scale(memo)
+            memo = enforce_bear_thesis(memo)
+            memo["majority_raw"] = majority_raw
+            memo["majority_weighted"] = majority_weighted
+            memo["agents_positive"] = pos
+            memo["agents_negative"] = neg
+            memo["agents_neutral"] = neu
 
         social_findings = session["agent_results"].get("social_sentiment", {}).get("findings", "")
         social_signal = _extract_social_signal(social_findings)
@@ -720,15 +732,11 @@ class ResearchManager:
             social_signal["influenced_verdict"] = True
 
         memo.setdefault("social_signal", social_signal)
-        if memo.get("social_signal", {}).get("influenced_verdict"):
+        if mode != "research" and memo.get("social_signal", {}).get("influenced_verdict"):
             logger.log_warn(
                 "Social sentiment influenced the verdict direction. Verify fundamental support before acting."
             )
 
-        memo = validate_valuation_verdict(memo, session["agent_results"])
-        memo = cap_investment_action(memo, depth)
-        memo = apply_depth_metadata(memo, depth, agent_ids)
-        memo = validate_memo(memo, session["agent_results"])
         financial_findings = session["agent_results"].get("financial", {}).get("findings", "")
         all_findings = " ".join(
             r.get("findings", "") for r in session["agent_results"].values()
@@ -737,16 +745,26 @@ class ResearchManager:
         snapshot = memo.setdefault("financial_snapshot", {})
         memo["financial_snapshot"] = extract_financial_snapshot(snapshot, financial_findings, all_findings=all_findings)
 
+        if mode != "research":
+            memo = validate_valuation_verdict(memo, session["agent_results"])
+            memo = cap_investment_action(memo, depth)
+            memo = apply_depth_metadata(memo, depth, agent_ids)
+            memo = validate_memo(memo, session["agent_results"])
+
         session["memo"] = memo
         await self._save(session_id)
-        await self._push_event(
-            session_id,
-            "memo",
-            f"Memo ready: {memo.get('verdict')} | {memo.get('confidence')} | score {memo.get('overall_score')}",
-        )
-        logger.log_memo(
-            f"Verdict: {memo.get('verdict')} | Confidence: {memo.get('confidence')} | Score: {memo.get('overall_score')}/10"
-        )
+        if mode == "research":
+            await self._push_event(session_id, "memo", "Research dossier ready (raw mode).")
+            logger.log_memo("Research dossier generated (mode=research)")
+        else:
+            await self._push_event(
+                session_id,
+                "memo",
+                f"Memo ready: {memo.get('verdict')} | {memo.get('confidence')} | score {memo.get('overall_score')}",
+            )
+            logger.log_memo(
+                f"Verdict: {memo.get('verdict')} | Confidence: {memo.get('confidence')} | Score: {memo.get('overall_score')}/10"
+            )
 
     async def _run_phase_technical(self, session_id: str, target: str) -> None:
         """
@@ -861,6 +879,7 @@ class ResearchManager:
         return {
             "session_id": session.get("session_id"),
             "target": session.get("target"),
+            "mode": session.get("mode", "standard"),
             "status": session.get("status"),
             "phase": session.get("phase"),
             "phase_name": session.get("phase_name"),

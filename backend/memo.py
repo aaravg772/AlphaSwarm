@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import unicodedata
 from datetime import datetime, timezone
 from html import escape
 from typing import Any
@@ -126,6 +127,88 @@ def _strip_markdown(text: str) -> str:
     clean = re.sub(r"[`*_>#-]", "", text or "")
     clean = re.sub(r"\s+", " ", clean)
     return clean.strip()
+
+
+def _clean_report_text(text: str) -> str:
+    raw = (text or "").replace("\r", "")
+    raw = re.sub(r"\*\*(.*?)\*\*", r"\1", raw)
+    raw = re.sub(r"^#{1,6}\s*", "", raw, flags=re.MULTILINE)
+    raw = raw.replace("•", "- ").replace("—", "- ").replace("→", "->")
+    raw = unicodedata.normalize("NFKD", raw).encode("ascii", "ignore").decode("ascii")
+    raw = re.sub(r"[ \t]+", " ", raw)
+    raw = re.sub(r"\n{3,}", "\n\n", raw)
+    return raw.strip()
+
+
+def build_research_mode_memo(
+    *,
+    target: str,
+    depth: str,
+    agent_ids: list[str],
+    agent_results: dict[str, Any],
+    cross_exam_notes: list[dict[str, Any]],
+    technical_analysis: dict[str, Any] | None,
+) -> dict[str, Any]:
+    sections: list[dict[str, Any]] = []
+    source_index: list[dict[str, str]] = []
+
+    for aid in agent_ids:
+        result = agent_results.get(aid, {})
+        name = result.get("name") or aid
+        status = result.get("status", "pending")
+        findings = _clean_report_text(result.get("findings", ""))
+        sources = result.get("sources") or []
+        for src in sources:
+            source_index.append(
+                {
+                    "agent_id": aid,
+                    "agent_name": name,
+                    "url": src.get("url") or src.get("query") or "",
+                    "query": src.get("query") or "",
+                }
+            )
+        sections.append(
+            {
+                "agent_id": aid,
+                "agent_name": name,
+                "status": status,
+                "findings": findings if findings else "No findings returned.",
+                "source_count": len(sources),
+            }
+        )
+
+    clean_cross = []
+    for note in cross_exam_notes or []:
+        if note.get("skipped"):
+            clean_cross.append({"pair": "cross_exam", "note": _clean_report_text(note.get("reason", ""))})
+            continue
+        pair = f"{note.get('agent_a', '?')} x {note.get('agent_b', '?')}"
+        clean_cross.append({"pair": pair, "note": _clean_report_text(note.get("note", ""))})
+
+    ta = technical_analysis or {}
+    ta_report = {
+        "ticker": ta.get("ticker"),
+        "is_public": ta.get("is_public", False),
+        "technical_score": ta.get("technical_score"),
+        "technical_direction": ta.get("technical_direction"),
+        "summary": _clean_report_text(ta.get("findings", "")),
+        "error": ta.get("error"),
+    }
+
+    return {
+        "mode": "research",
+        "target": target,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "depth": depth,
+        "summary": (
+            "Research mode dossier. This report presents source-backed findings without verdicts or investment actions. "
+            "Use it as a structured intelligence pack for your own decision process."
+        ),
+        "research_sections": sections,
+        "cross_exam_notes": clean_cross,
+        "technical_report": ta_report,
+        "source_index": source_index,
+    }
 
 
 def truncate_findings(findings: str, max_chars: int | None = None) -> str:
@@ -675,14 +758,468 @@ def memo_to_markdown(session_data: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
+def _memo_to_pdf_research(session_data: dict[str, Any], out_path: str) -> None:
+    """Generate dossier-oriented PDF for research mode (no verdict framing)."""
+    memo = session_data.get("memo") or {}
+    target = session_data.get("target", "Unknown")
+    generated = (memo.get("generated_at") or "").replace("T", " ")[:19] or datetime.now(timezone.utc).isoformat()[:19]
+    depth = (session_data.get("depth") or memo.get("depth") or "").upper() or "STANDARD"
+    agent_ids = session_data.get("agent_ids") or []
+    agent_count = len(agent_ids)
+
+    C_ACCENT = colors.HexColor("#00b4a6")
+    C_TEXT = colors.HexColor("#0f172a")
+    C_MUTED = colors.HexColor("#64748b")
+    C_PANEL = colors.HexColor("#f8fafc")
+    C_BORDER = colors.HexColor("#e2e8f0")
+    C_WHITE = colors.white
+    C_HEADING = colors.HexColor("#1e293b")
+    C_BLUE = colors.HexColor("#1d4ed8")
+
+    def clean_text(raw: str, max_chars: int = 5000) -> str:
+        if not raw:
+            return ""
+        text = str(raw)[:max_chars]
+        text = re.sub(r"https?://\S+", "", text)
+        text = re.sub(r"\(\s*\)", "", text)
+        text = re.sub(r"\*{1,3}(.*?)\*{1,3}", r"\1", text)
+        text = re.sub(r"#{1,6}\s*", "", text)
+        text = re.sub(r"`[^`]*`", "", text)
+        text = re.sub(r"~~(.*?)~~", r"\1", text)
+        text = re.sub(r"\[(.*?)\]\((.*?)\)", r"\1", text)
+        text = re.sub(r"(?m)^\s*[-*]\s+", "", text)
+        text = text.replace("*", "").replace("_", " ")
+        text = re.sub(r"\[\d+\]", "", text)
+        safe = []
+        for ch in text:
+            cp = ord(ch)
+            if cp < 128:
+                safe.append(ch)
+            elif cp in (0x2013, 0x2014):
+                safe.append("-")
+            elif cp in (0x2018, 0x2019):
+                safe.append("'")
+            elif cp in (0x201c, 0x201d):
+                safe.append('"')
+            elif cp in (0x2026,):
+                safe.append("...")
+            elif unicodedata.category(ch).startswith("L"):
+                try:
+                    ch.encode("latin-1")
+                    safe.append(ch)
+                except Exception:
+                    safe.append("?")
+            else:
+                safe.append(" ")
+        text = "".join(safe)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        text = re.sub(r" {2,}", " ", text)
+        text = re.sub(r"\(\s*$", "", text)
+        text = re.sub(r"\[\s*$", "", text)
+        text = re.sub(r"\{\s*$", "", text)
+        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").strip()
+
+    def clean_url(url: str) -> str:
+        u = str(url or "").strip()
+        u = u.rstrip(".,;)]}>")
+        if u.startswith("("):
+            u = u[1:]
+        return u
+
+    def display_url(url: str) -> str:
+        u = clean_url(url)
+        if len(u) <= 130:
+            return u
+        return f"{u[:127]}..."
+
+    def extract_urls(value: Any) -> list[str]:
+        out: list[str] = []
+        if isinstance(value, dict):
+            for key in ("url", "link", "source", "href", "query"):
+                if key in value:
+                    out.extend(extract_urls(value.get(key)))
+            return out
+        if isinstance(value, list):
+            for item in value:
+                out.extend(extract_urls(item))
+            return out
+        raw = str(value or "")
+        if not raw:
+            return out
+        out.extend(re.findall(r"https?://[^\s\"'<>]+", raw))
+        if raw.startswith("http"):
+            out.append(raw)
+        return out
+
+    def split_ta_findings_sections(raw: str) -> list[tuple[str, str]]:
+        text = clean_text(raw or "", 14000)
+        if not text:
+            return []
+        headers = [
+            "TREND ANALYSIS",
+            "MOMENTUM INDICATORS",
+            "SUPPORT RESISTANCE",
+            "SIGNALS",
+            "CANDLESTICK PATTERNS",
+            "TECHNICAL VERDICT",
+            "CONFIDENCE",
+            "TOP FINDING",
+        ]
+        pattern = re.compile(r"\b(" + "|".join(re.escape(h) for h in headers) + r")\b")
+        matches = list(pattern.finditer(text))
+        if not matches:
+            return [("Technical Findings", text)]
+        sections: list[tuple[str, str]] = []
+        for i, m in enumerate(matches):
+            title = m.group(1).title()
+            start = m.end()
+            end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+            body = text[start:end].strip(" :|-")
+            if body:
+                sections.append((title, body))
+        return sections
+
+    base = getSampleStyleSheet()
+
+    def S(name: str, **kw) -> ParagraphStyle:
+        return ParagraphStyle(name, parent=base["Normal"], **kw)
+
+    h1 = S("r_h1", fontName="Helvetica-Bold", fontSize=20, leading=26, textColor=C_HEADING, spaceAfter=5 * mm)
+    h2 = S("r_h2", fontName="Helvetica-Bold", fontSize=11.5, leading=14, textColor=C_HEADING, spaceBefore=5 * mm, spaceAfter=2 * mm)
+    body = S("r_body", fontSize=9.4, leading=13.8, textColor=C_TEXT, spaceAfter=1.8 * mm)
+    tight = S("r_tight", fontSize=8.6, leading=12.2, textColor=C_TEXT, spaceAfter=1.2 * mm)
+    small = S("r_small", fontSize=7.8, leading=10.4, textColor=C_MUTED)
+    label = S("r_label", fontSize=8.2, fontName="Helvetica-Bold", textColor=C_MUTED)
+    value = S("r_value", fontSize=9.1, fontName="Helvetica-Bold", textColor=C_TEXT)
+    ta_section_h = S("r_ta_h", fontSize=8.9, leading=11.8, fontName="Helvetica-Bold", textColor=C_HEADING, spaceBefore=1.3 * mm, spaceAfter=0.6 * mm)
+    ta_item = S("r_ta_i", fontSize=8.4, leading=11.8, textColor=C_TEXT, leftIndent=4.2 * mm, firstLineIndent=-2.6 * mm, spaceAfter=0.8 * mm)
+
+    def P(text: str, style: ParagraphStyle) -> Paragraph:
+        cleaned = clean_text(text)
+        try:
+            return Paragraph(cleaned, style)
+        except Exception:
+            return Paragraph(re.sub(r"<[^>]+>", "", cleaned), style)
+
+    def PX(text: str, style: ParagraphStyle) -> Paragraph:
+        safe = str(text or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").strip()
+        return Paragraph(safe, style)
+
+    doc = SimpleDocTemplate(
+        out_path,
+        pagesize=A4,
+        leftMargin=17 * mm,
+        rightMargin=17 * mm,
+        topMargin=24 * mm,
+        bottomMargin=17 * mm,
+        title=f"AlphaSwarm Research Dossier - {target}",
+        author="AlphaSwarm",
+    )
+    width = A4[0] - 34 * mm
+    story: list[Any] = []
+
+    def draw_header_footer(canvas, doc_obj):
+        canvas.saveState()
+        page_num = canvas.getPageNumber()
+        top_y = A4[1] - 10 * mm
+        canvas.setStrokeColor(C_BORDER)
+        canvas.setLineWidth(0.6)
+        canvas.line(doc_obj.leftMargin, top_y, A4[0] - doc_obj.rightMargin, top_y)
+        canvas.setFont("Helvetica-Bold", 8)
+        canvas.setFillColor(C_ACCENT)
+        canvas.drawString(doc_obj.leftMargin, top_y + 2.3 * mm, "ALPHASWARM RESEARCH DOSSIER")
+        canvas.setFillColor(C_MUTED)
+        canvas.setFont("Helvetica", 7.8)
+        canvas.drawRightString(A4[0] - doc_obj.rightMargin, top_y + 2.3 * mm, clean_text(target, 70))
+
+        bottom_y = 9 * mm
+        canvas.setStrokeColor(C_BORDER)
+        canvas.setLineWidth(0.5)
+        canvas.line(doc_obj.leftMargin, bottom_y + 3.5 * mm, A4[0] - doc_obj.rightMargin, bottom_y + 3.5 * mm)
+        canvas.setFillColor(C_MUTED)
+        canvas.setFont("Helvetica", 7.2)
+        canvas.drawString(doc_obj.leftMargin, bottom_y, f"Generated {generated}")
+        canvas.drawRightString(A4[0] - doc_obj.rightMargin, bottom_y, f"Page {page_num}")
+        canvas.restoreState()
+
+    def rule(space_before: float = 1.2, space_after: float = 2.8):
+        story.append(Spacer(1, space_before * mm))
+        story.append(HRFlowable(width="100%", thickness=0.45, color=C_BORDER))
+        story.append(Spacer(1, space_after * mm))
+
+    def section(title: str, color_hex: str = "#1e293b"):
+        story.append(Paragraph(f'<font color="{color_hex}"><b>{clean_text(title, 90)}</b></font>', h2))
+
+    # Cover
+    story.append(Paragraph(clean_text(target, 180), h1))
+    meta_rows = [
+        ("Document Type", "Research Dossier (raw mode)"),
+        ("Generated", generated),
+        ("Depth", depth),
+        ("Agents Run", str(agent_count)),
+    ]
+    meta_table = Table(
+        [[Paragraph(f"<b>{k}</b>", label), Paragraph(clean_text(v, 80), value)] for k, v in meta_rows],
+        colWidths=[34 * mm, width - 34 * mm],
+        style=TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), C_PANEL),
+                ("BOX", (0, 0), (-1, -1), 0.6, C_BORDER),
+                ("INNERGRID", (0, 0), (-1, -1), 0.3, C_BORDER),
+                ("TOPPADDING", (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ]
+        ),
+    )
+    story.append(meta_table)
+    story.append(Spacer(1, 2.2 * mm))
+    story.append(
+        Table(
+            [[P(memo.get("summary") or "Research dossier mode report.", body)]],
+            colWidths=[width],
+            style=TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), C_WHITE),
+                    ("BOX", (0, 0), (-1, -1), 0.6, C_BORDER),
+                    ("TOPPADDING", (0, 0), (-1, -1), 6),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ]
+            ),
+        )
+    )
+    rule()
+
+    # Market snapshot
+    section("Market Snapshot")
+    fin = memo.get("financial_snapshot") or {}
+    metrics = [
+        ("Revenue", fin.get("revenue")),
+        ("Growth Rate", fin.get("growth_rate")),
+        ("Gross Margin", fin.get("gross_margin")),
+        ("Operating Margin", fin.get("operating_margin")),
+        ("P/E Ratio", fin.get("pe_ratio")),
+        ("EV/Revenue", fin.get("ev_revenue")),
+        ("Free Cash Flow", fin.get("fcf")),
+        ("Valuation", fin.get("valuation_verdict")),
+    ]
+    has_market_data = any(v not in (None, "", "Not found", "N/A", "None") for _, v in metrics)
+    if has_market_data:
+        rows = []
+        for i in range(0, len(metrics), 2):
+            row = []
+            for k, v in metrics[i : i + 2]:
+                val = "N/A" if v in (None, "", "Not found", "N/A", "None") else clean_text(str(v), 70)
+                row.extend([Paragraph(f"<b>{k}</b>", label), Paragraph(val, value)])
+            rows.append(row)
+        mt = Table(rows, colWidths=[30 * mm, 44 * mm, 30 * mm, 44 * mm])
+        mt.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), C_PANEL),
+                    ("ROWBACKGROUNDS", (0, 0), (-1, -1), [C_PANEL, C_WHITE]),
+                    ("BOX", (0, 0), (-1, -1), 0.6, C_BORDER),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.3, C_BORDER),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ]
+            )
+        )
+        story.append(mt)
+    else:
+        story.append(P("No structured market/valuation fields were extracted for this run.", tight))
+    rule()
+
+    # Technical report
+    section("Technical Analysis", "#0f766e")
+    ta = session_data.get("technical_analysis") or {}
+    tr = memo.get("technical_report") or {}
+    is_public = bool(ta.get("is_public", tr.get("is_public", False)))
+    if not is_public:
+        story.append(P("Target appears private or unsupported for chart data. Technical analysis was skipped.", body))
+    elif ta.get("error") or tr.get("error"):
+        story.append(P(f"Technical analysis error: {clean_text(ta.get('error') or tr.get('error'), 400)}", body))
+    else:
+        ticker = clean_text(ta.get("ticker") or tr.get("ticker") or "", 16) or "N/A"
+        ta_score = ta.get("technical_score", tr.get("technical_score", "N/A"))
+        ta_dir = clean_text(str(ta.get("technical_direction", tr.get("technical_direction", "NEUTRAL"))), 16)
+        card = Table(
+            [
+                [Paragraph("<b>Ticker</b>", label), Paragraph(ticker, value), Paragraph("<b>Direction</b>", label), Paragraph(ta_dir, value)],
+                [Paragraph("<b>Technical Score</b>", label), Paragraph(clean_text(str(ta_score), 20), value), Paragraph("<b>Public Listing</b>", label), Paragraph("Yes", value)],
+            ],
+            colWidths=[30 * mm, 40 * mm, 30 * mm, width - 100 * mm],
+        )
+        card.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), C_PANEL),
+                    ("BOX", (0, 0), (-1, -1), 0.6, C_BORDER),
+                    ("INNERGRID", (0, 0), (-1, -1), 0.3, C_BORDER),
+                    ("TOPPADDING", (0, 0), (-1, -1), 4),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 6),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+                ]
+            )
+        )
+        story.append(card)
+        story.append(Spacer(1, 1.2 * mm))
+
+        # Structured technical findings body (prevents one giant unreadable paragraph)
+        findings_text = ta.get("findings") or tr.get("summary") or ""
+        sections = split_ta_findings_sections(findings_text)
+        if sections:
+            story.append(Spacer(1, 1.2 * mm))
+            story.append(P("Detailed Technical Breakdown", S("r_ta_title", fontSize=9.2, fontName="Helvetica-Bold", textColor=C_HEADING, spaceAfter=0.8 * mm)))
+            for title, content in sections:
+                if title.lower() == "signals":
+                    continue
+                story.append(P(title, ta_section_h))
+                chunks = [c.strip() for c in re.split(r"\s+\|\s+|(?<=\.)\s+(?=[A-Z])", content) if c.strip()]
+                if not chunks:
+                    chunks = [content]
+                for c in chunks:
+                    story.append(P(f"- {c}", ta_item))
+
+        signals = ta.get("signals") or []
+        if signals:
+            story.append(Spacer(1, 1.2 * mm))
+            story.append(P("Signal Set", S("r_sig_h", fontSize=8.9, fontName="Helvetica-Bold", textColor=C_HEADING, spaceAfter=0.8 * mm)))
+            for sig in signals[:10]:
+                signal = clean_text(sig.get("signal", ""), 90)
+                strength = clean_text(str(sig.get("strength", "")).upper(), 16) or "N/A"
+                detail = clean_text(sig.get("detail", ""), 260)
+                line = f"[{strength}] {signal}"
+                if detail:
+                    line += f": {detail}"
+                story.append(P(f"- {line}", ta_item))
+
+        patterns = ta.get("patterns") or []
+        if patterns:
+            story.append(Spacer(1, 1.0 * mm))
+            story.append(P("Candlestick Patterns", S("r_pat_h", fontSize=8.9, fontName="Helvetica-Bold", textColor=C_HEADING, spaceAfter=0.8 * mm)))
+            for pat in patterns[:10]:
+                pname = clean_text(pat.get("name", "Pattern"), 60)
+                ptype = clean_text(str(pat.get("type", "")).upper(), 16)
+                pdesc = clean_text(pat.get("desc", ""), 220)
+                txt = f"{pname} ({ptype})"
+                if pdesc:
+                    txt += f": {pdesc}"
+                story.append(P(f"- {txt}", ta_item))
+    rule()
+
+    # Cross-examination notes
+    section("Cross-Examination Notes", "#7c3aed")
+    notes = memo.get("cross_exam_notes") or []
+    if not notes:
+        story.append(P("No cross-examination notes captured.", tight))
+    else:
+        for idx, note in enumerate(notes, 1):
+            pair = clean_text(note.get("pair", "cross_exam"), 60)
+            content = clean_text(note.get("note", "No note"), 1000)
+            story.append(P(f"{idx}. {pair}", S("r_pair", fontSize=9.1, fontName="Helvetica-Bold", textColor=C_HEADING, spaceAfter=0.7 * mm)))
+            story.append(P(content, tight))
+    rule()
+
+    # Agent findings
+    story.append(PageBreak())
+    section("Raw Agent Findings", "#1d4ed8")
+    sections = memo.get("research_sections") or []
+    if not sections:
+        story.append(P("No research sections were generated.", body))
+    for idx, sec in enumerate(sections, 1):
+        agent_name = clean_text(sec.get("agent_name") or sec.get("agent_id") or f"agent_{idx}", 90)
+        status = clean_text(sec.get("status") or "unknown", 20).upper()
+        source_count = sec.get("source_count", 0)
+        story.append(Spacer(1, 2.5 * mm))
+        header = Table(
+            [[
+                Paragraph(f"<b>{idx}. {agent_name}</b>", S("r_ah", fontSize=9.6, fontName="Helvetica-Bold", textColor=C_WHITE)),
+                Paragraph(f"{status} | {source_count} sources", S("r_am", fontSize=8, textColor=C_WHITE, alignment=2)),
+            ]],
+            colWidths=[width * 0.76, width * 0.24],
+            style=TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, -1), C_BLUE),
+                    ("TOPPADDING", (0, 0), (-1, -1), 5),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 7),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 7),
+                ]
+            ),
+        )
+        story.append(header)
+        findings = clean_text(sec.get("findings") or "No findings returned.", 12000)
+        for line in findings.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            if line.startswith("-"):
+                story.append(P(line, tight))
+            else:
+                story.append(P(line, body))
+
+    # Sources (links only)
+    story.append(PageBreak())
+    section("Source Index")
+    source_index = memo.get("source_index") or []
+    deduped_links: list[str] = []
+    seen_links: set[str] = set()
+    for src in source_index[:800]:
+        for candidate in (src.get("url"), src.get("query")):
+            for u in extract_urls(candidate):
+                cu = clean_url(u)
+                if cu and cu.upper() != "N/A" and cu not in seen_links:
+                    seen_links.add(cu)
+                    deduped_links.append(display_url(cu))
+
+    # Fallback: pull URLs directly from raw agent source payloads if source_index is sparse
+    if not deduped_links:
+        for result in (session_data.get("agent_results") or {}).values():
+            for src in (result.get("sources") or []):
+                for u in extract_urls(src):
+                    cu = clean_url(u)
+                    if cu and cu.upper() != "N/A" and cu not in seen_links:
+                        seen_links.add(cu)
+                        deduped_links.append(display_url(cu))
+
+    if deduped_links:
+        for link in deduped_links[:500]:
+            story.append(PX(f"- {link}", tight))
+    else:
+        story.append(P("No source links captured.", tight))
+    story.append(Spacer(1, 5 * mm))
+    story.append(HRFlowable(width="100%", thickness=0.45, color=C_BORDER))
+    story.append(Spacer(1, 1.5 * mm))
+    story.append(
+        Paragraph(
+            "This dossier is generated for informational research use and does not provide an investment recommendation.",
+            S("r_disc", fontSize=7.4, textColor=C_MUTED),
+        )
+    )
+
+    doc.build(story, onFirstPage=draw_header_footer, onLaterPages=draw_header_footer)
+
+
 def memo_to_pdf(session_data: dict[str, Any], out_path: str) -> None:
     """Generate a polished PDF research memo using reportlab."""
     if not REPORTLAB_OK:
         raise RuntimeError("reportlab is not installed. Run: pip install reportlab")
 
+    memo = session_data.get("memo") or {}
+    mode = (memo.get("mode") or session_data.get("mode") or "standard").lower()
+    if mode == "research":
+        _memo_to_pdf_research(session_data, out_path)
+        return
+
     import unicodedata
 
-    memo = session_data.get("memo") or {}
     target = session_data.get("target", "Unknown")
     generated = (memo.get("generated_at") or "").replace("T", " ")[:19] or datetime.now(timezone.utc).isoformat()[:19]
     depth = (session_data.get("depth") or "").upper()

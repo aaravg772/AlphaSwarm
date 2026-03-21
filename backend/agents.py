@@ -363,14 +363,6 @@ CROSS_EXAM_PAIRS: list[tuple[str, str]] = [
     ("customer_quality", "growth"),
 ]
 
-FOCUS_PRIORITIES = {
-    "financial": ["financial", "growth", "customer_quality", "management", "comparable"],
-    "competitive": ["competitive", "technology", "product", "growth", "comparable"],
-    "risk": ["regulatory", "bear", "macro", "supply_chain", "management"],
-    "opportunity": ["bull", "growth", "technology", "financial", "international"],
-}
-
-
 def _effective_compound_calls(spec: AgentSpec) -> int:
     if spec.id == "synthesis_judge":
         return 0
@@ -422,18 +414,13 @@ def list_research_agents() -> list[AgentSpec]:
     return [get_agent(aid) for aid in AGENTS if aid != "synthesis_judge"]
 
 
-def resolve_agent_ids(depth: str, focus: str = "all-around", custom_agent_ids: list[str] | None = None) -> list[str]:
+def resolve_agent_ids(depth: str, custom_agent_ids: list[str] | None = None) -> list[str]:
     active_depths = refresh_depth_config()
     d = (depth or "standard").lower()
     if d == "custom":
         return [a for a in (custom_agent_ids or []) if a in AGENTS and a != "synthesis_judge"]
 
-    agent_ids = list(active_depths.get(d, active_depths["standard"])["agents"])
-    f = (focus or cfg.default_focus or "all-around").lower()
-    if f in FOCUS_PRIORITIES:
-        rank = {aid: idx for idx, aid in enumerate(FOCUS_PRIORITIES[f])}
-        agent_ids = sorted(agent_ids, key=lambda aid: rank.get(aid, 999))
-    return agent_ids
+    return list(active_depths.get(d, active_depths["standard"])["agents"])
 
 
 def get_depth_required_calls(depth: str, custom_agent_ids: list[str] | None = None) -> int:

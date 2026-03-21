@@ -32,15 +32,75 @@
 
     const data = await fetch(`/api/history/${sessionId}`).then((r) => r.json());
     const memo = data.memo || {};
+    const mode = (memo.mode || data.mode || "standard").toLowerCase();
+    const isResearchMode = mode === "research";
+
+    const hideInResearch = [
+      "summary-card",
+      "prediction-card",
+      "thesis-grid",
+      "key-findings-section",
+      "risks-catalysts-grid",
+      "score-section",
+      "social-panel",
+      "cross-section",
+      "validation-section",
+    ];
+    hideInResearch.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = isResearchMode ? "none" : "";
+    });
+    const researchPanel = document.getElementById("research-dossier");
+    if (researchPanel) researchPanel.style.display = isResearchMode ? "" : "none";
 
     document.getElementById("memo-target").textContent = data.target || "Untitled";
     document.getElementById("memo-meta").textContent = `Last researched: ${(data.updated_at || "").replace("T", " ").slice(0, 19)} | ${(data.agent_ids || []).length} agents | ${Object.values(data.agent_results || {}).reduce((a, b) => a + (b.sources || []).length, 0)} sources`;
 
     const verdict = memo.verdict || "NEUTRAL";
-    document.getElementById("verdict-badge").textContent = verdict;
-    document.getElementById("confidence-badge").textContent = `${memo.confidence || "LOW"} confidence`;
-    document.getElementById("verdict-badge").style.borderColor = verdictColor(verdict);
-    document.getElementById("summary-card").style.borderColor = verdictColor(verdict);
+    const verdictBadge = document.getElementById("verdict-badge");
+    const confidenceBadge = document.getElementById("confidence-badge");
+    if (verdictBadge) verdictBadge.style.display = isResearchMode ? "none" : "";
+    if (confidenceBadge) confidenceBadge.style.display = isResearchMode ? "none" : "";
+    if (!isResearchMode) {
+      document.getElementById("verdict-badge").textContent = verdict;
+      document.getElementById("confidence-badge").textContent = `${memo.confidence || "LOW"} confidence`;
+      document.getElementById("verdict-badge").style.borderColor = verdictColor(verdict);
+      document.getElementById("summary-card").style.borderColor = verdictColor(verdict);
+    }
+
+    if (isResearchMode) {
+      const summaryEl = document.getElementById("research-dossier-summary");
+      const bodyEl = document.getElementById("research-dossier-body");
+      if (summaryEl) summaryEl.textContent = memo.summary || "Research dossier mode.";
+      if (bodyEl) {
+        const sections = memo.research_sections || [];
+        const cross = memo.cross_exam_notes || [];
+        const tech = memo.technical_report || {};
+        bodyEl.innerHTML = [
+          `<article style="padding:12px 0;border-bottom:1px solid var(--border);">
+            <h4 style="margin:0 0 8px;">Technical Analysis Report</h4>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">
+              ${escHtml(tech.ticker || "-")} · ${escHtml(tech.technical_direction || "N/A")} · Score ${tech.technical_score != null ? escHtml(String(tech.technical_score)) : "N/A"}/10
+            </div>
+            <div style="color:#cbd5e1;line-height:1.7;white-space:pre-line;font-size:13.5px;">${escHtml(tech.summary || "Technical analysis not available for this target.")}</div>
+          </article>`,
+          ...sections.map((s) => `<article style="padding:12px 0;border-bottom:1px solid var(--border);">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px;">
+              <h4 style="margin:0;">${escHtml(s.agent_name || s.agent_id || "Agent")}</h4>
+              <span class="tag">${escHtml(s.status || "")} · ${Number(s.source_count || 0)} sources</span>
+            </div>
+            <div style="color:#cbd5e1;line-height:1.7;white-space:pre-line;font-size:13.5px;">${escHtml(s.findings || "")}</div>
+          </article>`),
+          cross.length ? `<article style="padding:12px 0;">
+            <h4 style="margin:0 0 8px;">Cross-Examination Notes</h4>
+            ${(cross || []).map((n) => `<div style="padding:8px 0;border-bottom:1px solid rgba(31,42,61,0.5);">
+              <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">${escHtml(n.pair || "pair")}</div>
+              <div style="color:#cbd5e1;line-height:1.65;white-space:pre-line;">${escHtml(n.note || "")}</div>
+            </div>`).join("")}
+          </article>` : "",
+        ].join("");
+      }
+    }
 
     document.getElementById("summary-card").innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">

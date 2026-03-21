@@ -35,7 +35,7 @@ async function loadRoute() {
   }
   const { path, params } = parseHash();
   const page = routes[path] || routes["/"];
-  const html = await fetch(page).then((r) => r.text());
+  const html = await fetch(page, { cache: "no-store" }).then((r) => r.text());
   appRoot.innerHTML = html;
 
   if (path === "/") {

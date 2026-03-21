@@ -3,7 +3,7 @@
     meta: null,
     budget: null,
     depth: "quick",
-    focus: "all-around",
+    mode: "standard",
     customAgents: new Set(),
     sessionPolling: null,
     startedAt: null,
@@ -76,7 +76,8 @@
     const calls = depthCalls(state.depth);
     const remaining = state.budget.remaining;
     document.getElementById("run-btn").textContent = `Run Research (${calls} compound calls)`;
-    document.getElementById("run-help").textContent = `~${state.depth === "quick" ? 2 : state.depth === "standard" ? 6 : state.depth === "deep" ? 12 : 4} minutes estimated · Technical chart analysis included (free)`;
+    const modeLabel = state.mode === "research" ? "Raw research dossier" : "Verdict memo";
+    document.getElementById("run-help").textContent = `~${state.depth === "quick" ? 2 : state.depth === "standard" ? 6 : state.depth === "deep" ? 12 : 4} minutes estimated · ${modeLabel} · Technical chart analysis included (free)`;
     document.getElementById("budget-line").textContent = `Today: ${state.budget.used} compound calls used (${remaining} remaining)`;
     const btn = document.getElementById("run-btn");
     btn.disabled = calls > remaining || calls <= 0;
@@ -104,7 +105,7 @@
       card.addEventListener("click", () => {
         state.depth = card.dataset.depth;
         if (state.depth !== "custom") state.customAgents = new Set(depthAgents(state.depth));
-        document.getElementById("custom-agent-box").style.display = state.depth === "custom" || state.focus === "custom" ? "block" : "none";
+        document.getElementById("custom-agent-box").style.display = state.depth === "custom" ? "block" : "none";
         renderDepthCards();
         recalcHome();
       });
@@ -145,20 +146,44 @@
     const budget = await fetch("/api/budget").then((r) => r.json());
     state.meta = meta;
     state.budget = budget;
+    state.mode = (meta.settings && meta.settings.default_mode) || "standard";
     state.customAgents = new Set(meta.depth_config.quick.agents);
     document.getElementById("hero-start").onclick = () => document.getElementById("new-research").scrollIntoView({ behavior: "smooth" });
     document.getElementById("hero-sample").onclick = () => { location.hash = "#/history"; };
     renderDepthCards();
     renderCustomList();
     initTickerStrip();
-    document.getElementById("focus-row").querySelectorAll(".pill").forEach((p) => {
-      p.addEventListener("click", () => {
-        document.getElementById("focus-row").querySelectorAll(".pill").forEach((x) => x.classList.remove("active"));
-        p.classList.add("active");
-        state.focus = p.dataset.focus;
-        document.getElementById("custom-agent-box").style.display = state.focus === "custom" || state.depth === "custom" ? "block" : "none";
+    // Backward-compatible fallback: if cached home.html lacks mode selector, inject it.
+    let modeRow = document.getElementById("mode-row");
+    if (!modeRow) {
+      const runBtn = document.getElementById("run-btn");
+      const host = document.getElementById("new-research");
+      if (runBtn && host && runBtn.parentNode) {
+        const modeWrap = document.createElement("div");
+        modeWrap.innerHTML = `
+          <h3>Mode</h3>
+          <div class="pills" id="mode-row">
+            <button class="pill active" data-mode="standard">Standard (Verdict)</button>
+            <button class="pill" data-mode="research">Research (Raw Dossier)</button>
+          </div>
+        `;
+        runBtn.parentNode.insertBefore(modeWrap, runBtn);
+        modeRow = document.getElementById("mode-row");
+      }
+    }
+    document.getElementById("custom-agent-box").style.display = state.depth === "custom" ? "block" : "none";
+    modeRow = document.getElementById("mode-row");
+    if (modeRow) {
+      modeRow.querySelectorAll(".pill").forEach((x) => x.classList.toggle("active", x.dataset.mode === state.mode));
+      modeRow.querySelectorAll(".pill").forEach((p) => {
+        p.addEventListener("click", () => {
+          modeRow.querySelectorAll(".pill").forEach((x) => x.classList.remove("active"));
+          p.classList.add("active");
+          state.mode = p.dataset.mode || "standard";
+          recalcHome();
+        });
       });
-    });
+    }
     const context = document.getElementById("context");
     const targetInput = document.getElementById("target");
     targetInput.addEventListener("blur", async () => {
@@ -170,7 +195,7 @@
       if (!target) return;
       const targetCheck = await validateTarget(target, true);
       if (!targetCheck || !targetCheck.is_valid) return;
-      const payload = { target, depth: state.depth, focus: state.focus, context: context.value, specific_questions: document.getElementById("specific_questions").value, agent_ids: [...state.customAgents], force_refresh: true };
+      const payload = { target, mode: state.mode, depth: state.depth, context: context.value, specific_questions: document.getElementById("specific_questions").value, agent_ids: [...state.customAgents], force_refresh: true };
       const btn = document.getElementById("run-btn");
       btn.disabled = true;
       btn.textContent = "Dispatching agents...";
@@ -320,7 +345,19 @@
         proceedBtn.textContent = awaiting===3?"Start Cross-Examination →":awaiting===4?"Start Synthesis →":"Proceed →";
         if (awaitingMsg) awaitingMsg.textContent = data.awaiting_user_message||"Phase complete — proceed when ready.";
       } else { awaitingPill.classList.add("hidden"); proceedBtn.classList.add("hidden"); if (awaitingMsg) awaitingMsg.textContent=""; }
-      if (phase===4&&data.memo) { const preview=document.getElementById("synthesis-verdict-preview"); const inner=document.getElementById("verdict-preview-inner"); if (preview&&inner) { preview.classList.remove("hidden"); const vc=data.memo.verdict==="BULLISH"?"#22c55e":data.memo.verdict==="BEARISH"?"#ef4444":"#f59e0b"; inner.innerHTML=`<div style="font-size:22px;font-weight:700;color:${vc}">${data.memo.verdict}</div><div style="font-size:13px;color:var(--muted);margin-top:4px;">Score: ${data.memo.overall_score}/10 | ${data.memo.confidence} confidence</div><div style="font-size:13px;margin-top:6px;">${escapeHtml(data.memo.summary||"")}</div>`; } }
+      if (phase===4&&data.memo) {
+        const preview=document.getElementById("synthesis-verdict-preview");
+        const inner=document.getElementById("verdict-preview-inner");
+        if (preview&&inner) {
+          preview.classList.remove("hidden");
+          if ((data.mode||"standard")==="research") {
+            inner.innerHTML=`<div style="font-size:18px;font-weight:700;color:#00e5cc">Research Dossier</div><div style="font-size:13px;color:var(--muted);margin-top:6px;">Formatting raw findings with no verdict/recommendation.</div>`;
+          } else {
+            const vc=data.memo.verdict==="BULLISH"?"#22c55e":data.memo.verdict==="BEARISH"?"#ef4444":"#f59e0b";
+            inner.innerHTML=`<div style="font-size:22px;font-weight:700;color:${vc}">${data.memo.verdict}</div><div style="font-size:13px;color:var(--muted);margin-top:4px;">Score: ${data.memo.overall_score}/10 | ${data.memo.confidence} confidence</div><div style="font-size:13px;margin-top:6px;">${escapeHtml(data.memo.summary||"")}</div>`;
+          }
+        }
+      }
       if (data.status === "complete") {
         clearInterval(state.sessionPolling);
         showPhasePage(5);
@@ -328,8 +365,14 @@
         document.getElementById("cs-agents").textContent = data.agents_total||"–";
         document.getElementById("cs-sources").textContent = totalSources;
         document.getElementById("cs-calls").textContent = data.budget_used||0;
-        document.getElementById("cs-verdict").textContent = data.memo?.verdict||"–";
-        document.getElementById("cs-score").textContent = data.memo?.overall_score ? `${data.memo.overall_score}/10` : "–";
+        const runMode = data.mode || "standard";
+        if (runMode === "research") {
+          document.getElementById("cs-verdict").textContent = "DOSSIER";
+          document.getElementById("cs-score").textContent = "N/A";
+        } else {
+          document.getElementById("cs-verdict").textContent = data.memo?.verdict||"–";
+          document.getElementById("cs-score").textContent = data.memo?.overall_score ? `${data.memo.overall_score}/10` : "–";
+        }
         const taScore = data.technical_analysis?.technical_score;
         const taDir = data.technical_analysis?.technical_direction;
         const csTech = document.getElementById("cs-tech-score");
@@ -365,7 +408,7 @@
 
   async function rerun(sessionId) {
     const old = await fetch(`/api/history/${sessionId}`).then((r) => r.json());
-    const payload = { target:old.target, depth:old.depth, focus:old.focus, context:old.context||"", specific_questions:old.specific_questions||"", agent_ids:old.agent_ids||[], force_refresh:true };
+    const payload = { target:old.target, mode:old.mode||"standard", depth:old.depth, context:old.context||"", specific_questions:old.specific_questions||"", agent_ids:old.agent_ids||[], force_refresh:true };
     const res = await fetch("/api/research/start", { method:"POST", cache:"no-store", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
     const data = await res.json();
     if (data.session_id) location.hash = `#/research?session_id=${encodeURIComponent(data.session_id)}&run_id=${Date.now()}`;

@@ -31,7 +31,7 @@ class AlphaConfig:
     budget_hard_floor: int = 5
 
     default_depth: str = "standard"
-    default_focus: str = "all"
+    default_mode: str = "standard"
     compound_searches_override: int = -1
 
     phase1_enabled: bool = True

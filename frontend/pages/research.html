@@ -1,0 +1,190 @@
+<!-- Phase Navigation Bar -->
+<div class="phase-nav" id="phase-nav">
+  <div class="phase-nav-inner">
+    <div class="phase-step" id="pstep-1" data-phase="1">
+      <div class="phase-step-dot"></div>
+      <span class="phase-step-label">Phase 1<br><small>Research</small></span>
+    </div>
+    <div class="phase-connector" id="pconn-1"></div>
+    <div class="phase-step" id="pstep-2" data-phase="2">
+      <div class="phase-step-dot"></div>
+      <span class="phase-step-label">Phase 2<br><small>Technical</small></span>
+    </div>
+    <div class="phase-connector" id="pconn-2"></div>
+    <div class="phase-step" id="pstep-3" data-phase="3">
+      <div class="phase-step-dot"></div>
+      <span class="phase-step-label">Phase 3<br><small>Cross-Exam</small></span>
+    </div>
+    <div class="phase-connector" id="pconn-3"></div>
+    <div class="phase-step" id="pstep-4" data-phase="4">
+      <div class="phase-step-dot"></div>
+      <span class="phase-step-label">Phase 4<br><small>Synthesis</small></span>
+    </div>
+    <div class="phase-connector" id="pconn-4"></div>
+    <div class="phase-step" id="pstep-5" data-phase="5">
+      <div class="phase-step-dot"></div>
+      <span class="phase-step-label">Complete<br><small>Memo</small></span>
+    </div>
+  </div>
+</div>
+
+<!-- Sticky header -->
+<div class="research-header card" id="research-sticky-header">
+  <div class="row">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="target-badge" id="research-target">–</div>
+      <div>
+        <div id="phase-text" style="font-weight:600;font-size:15px;"></div>
+        <div id="phase-subtext" style="color:var(--muted);font-size:12px;margin-top:2px;"></div>
+      </div>
+    </div>
+    <div class="row" style="gap:10px;align-items:center;">
+      <div class="budget-used-badge" id="calls-used-badge">0 calls used</div>
+      <span id="awaiting-pill" class="tag hidden" style="border-color:#f59e0b;color:#fbbf24;">&#9646; Awaiting input</span>
+      <button id="proceed-btn" class="btn btn-primary hidden">Proceed &rarr;</button>
+    </div>
+  </div>
+  <div class="progress" style="margin-top:10px;height:4px;">
+    <div id="overall-progress" style="width:0%;transition:width 0.5s ease;"></div>
+  </div>
+</div>
+
+<!-- PHASE 1: Research -->
+<div class="phase-page" id="page-phase-1">
+  <div class="phase-page-header">
+    <div class="phase-number-glyph">01</div>
+    <div>
+      <h2 style="margin:0;">Independent Research</h2>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:14px;">Specialist agents search the live web concurrently</p>
+    </div>
+    <div class="phase-status-chip" id="phase1-chip">Running</div>
+  </div>
+  <div class="research-split">
+    <div class="research-agents-col">
+      <div class="col-header">Agent Status</div>
+      <div id="agent-grid"></div>
+    </div>
+    <div class="terminal-col">
+      <div class="col-header">
+        <span>Live Terminal</span>
+        <button class="terminal-clear-btn" id="clear-log-btn">Clear</button>
+      </div>
+      <div class="terminal-pane" id="terminal-pane">
+        <div class="terminal-line terminal-sys">AlphaSwarm terminal ready...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PHASE 2: Technical Analysis -->
+<div class="phase-page hidden" id="page-phase-2">
+  <div class="phase-page-header">
+    <div class="phase-number-glyph">02</div>
+    <div>
+      <h2 style="margin:0;">Technical Analysis</h2>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:14px;">Chart analysis — RSI, MACD, Bollinger Bands, S/R levels, candlestick patterns (free, no API calls)</p>
+    </div>
+    <div class="phase-status-chip" id="phase2-chip">Running</div>
+  </div>
+  <div class="research-split">
+    <div class="research-agents-col">
+      <div class="col-header">Technical Signals</div>
+      <div id="ta-signals-live" style="border:1px solid var(--border);border-radius:0 0 8px 8px;padding:10px;min-height:200px;">
+        <div style="color:var(--muted);font-size:13px;padding:20px;text-align:center;">
+          <div style="font-size:24px;margin-bottom:8px;">📈</div>
+          Fetching market data and computing indicators...
+        </div>
+      </div>
+    </div>
+    <div class="terminal-col">
+      <div class="col-header"><span>Live Terminal</span></div>
+      <div class="terminal-pane" id="terminal-pane-2"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PHASE 3: Cross-Examination -->
+<div class="phase-page hidden" id="page-phase-3">
+  <div class="phase-page-header">
+    <div class="phase-number-glyph">03</div>
+    <div>
+      <h2 style="margin:0;">Cross-Examination</h2>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:14px;">Agents verify each other's claims and flag contradictions</p>
+    </div>
+    <div class="phase-status-chip" id="phase3-chip">Pending</div>
+  </div>
+  <div class="research-split">
+    <div class="research-agents-col">
+      <div class="col-header">Cross-Exam Pairs</div>
+      <div id="cross-pairs-grid"></div>
+    </div>
+    <div class="terminal-col">
+      <div class="col-header"><span>Live Terminal</span></div>
+      <div class="terminal-pane" id="terminal-pane-3"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PHASE 4: Synthesis -->
+<div class="phase-page hidden" id="page-phase-4">
+  <div class="phase-page-header">
+    <div class="phase-number-glyph">04</div>
+    <div>
+      <h2 style="margin:0;">Synthesis</h2>
+      <p style="margin:4px 0 0;color:var(--muted);font-size:14px;">Synthesis judge reads all findings — including chart data — and writes the investment memo</p>
+    </div>
+    <div class="phase-status-chip" id="phase4-chip">Pending</div>
+  </div>
+  <div class="research-split">
+    <div class="research-agents-col">
+      <div class="col-header">Agent Findings Summary</div>
+      <div id="synthesis-findings-list"></div>
+      <div id="synthesis-verdict-preview" class="hidden" style="margin-top:16px;">
+        <div class="col-header">Verdict Preview</div>
+        <div class="verdict-preview-card" id="verdict-preview-inner"></div>
+      </div>
+    </div>
+    <div class="terminal-col">
+      <div class="col-header"><span>Live Terminal</span></div>
+      <div class="terminal-pane" id="terminal-pane-4"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PHASE 5: Complete -->
+<div class="phase-page hidden" id="page-phase-5">
+  <div class="phase-page-header" style="justify-content:center;text-align:center;flex-direction:column;gap:12px;">
+    <div class="complete-glyph">&#10003;</div>
+    <h2 style="margin:0;">Research Complete</h2>
+    <p style="color:var(--muted);margin:0;">All phases finished. Your investment memo is ready.</p>
+  </div>
+  <div class="complete-summary-row">
+    <div class="complete-stat-card">
+      <div class="complete-stat-val" id="cs-agents">–</div>
+      <div class="complete-stat-lbl">Agents</div>
+    </div>
+    <div class="complete-stat-card">
+      <div class="complete-stat-val" id="cs-sources">–</div>
+      <div class="complete-stat-lbl">Sources</div>
+    </div>
+    <div class="complete-stat-card">
+      <div class="complete-stat-val" id="cs-calls">–</div>
+      <div class="complete-stat-lbl">Compound Calls</div>
+    </div>
+    <div class="complete-stat-card">
+      <div class="complete-stat-val" id="cs-verdict">–</div>
+      <div class="complete-stat-lbl">Verdict</div>
+    </div>
+    <div class="complete-stat-card">
+      <div class="complete-stat-val" id="cs-score">–</div>
+      <div class="complete-stat-lbl">Fund. Score</div>
+    </div>
+    <div class="complete-stat-card">
+      <div class="complete-stat-val" id="cs-tech-score">–</div>
+      <div class="complete-stat-lbl">Tech. Score</div>
+    </div>
+  </div>
+  <div style="display:flex;justify-content:center;margin-top:24px;">
+    <a id="to-memo" class="btn btn-primary" href="#" style="font-size:16px;padding:14px 28px;">View Full Memo &rarr;</a>
+  </div>
+</div>

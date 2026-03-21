@@ -1,0 +1,59 @@
+<section class="hero">
+  <div>
+    <h1>Intelligence, not just answers.</h1>
+    <h2>Real-time research. Multiple specialists. One verdict.</h2>
+    <p>AlphaSwarm dispatches specialist AI agents to research any company or thesis using live web search. Each agent owns a domain. They debate. You get the truth.</p>
+    <div class="row" style="justify-content:center; gap:10px; margin-top:16px;">
+      <button class="btn btn-primary" id="hero-start">Start Research -&gt;</button>
+      <button class="btn btn-outline" id="hero-sample">View Sample Report</button>
+    </div>
+  </div>
+</section>
+
+<section class="grid-3" style="margin-bottom:20px;">
+  <article class="card feature-card"><b>Real-Time Search</b><p style="color:var(--muted)">Live web data via Groq Compound</p></article>
+  <article class="card feature-card"><b>Specialist Agents</b><p style="color:var(--muted)">Up to 18 domain experts</p></article>
+  <article class="card feature-card"><b>Structured Output</b><p style="color:var(--muted)">Investment memo with scores and verdict</p></article>
+</section>
+
+<section class="card form-wrap" id="new-research">
+  <h2 style="margin-top:0">New Research</h2>
+  <p id="budget-line" style="color:var(--muted)">Your query consumed today: 0 compound calls (250 remaining)</p>
+
+  <h3>Step 1 - Target</h3>
+  <input id="target" class="input" placeholder="Company name or ticker (e.g. Apple, NVDA, SpaceX)..." oninput="(function(){var el=document.getElementById('target-validation-msg');if(el){el.textContent='';el.className='target-validation-msg';}})()" />
+  <div id="target-validation-msg" class="target-validation-msg"></div>
+
+  <h3>Step 2 - Depth</h3>
+  <div class="depth-grid" id="depth-grid"></div>
+  <div class="pills" id="depth-agent-pills" style="margin-top:10px;"></div>
+
+  <h3>Step 3 - Focus (optional)</h3>
+  <div class="pills" id="focus-row">
+    <button class="pill active" data-focus="all-around">All-around</button>
+    <button class="pill" data-focus="financial">Financial</button>
+    <button class="pill" data-focus="competitive">Competitive</button>
+    <button class="pill" data-focus="risk">Risk</button>
+    <button class="pill" data-focus="opportunity">Opportunity</button>
+    <button class="pill" data-focus="custom">Custom</button>
+  </div>
+
+  <div id="custom-agent-box" class="card" style="padding:12px; margin-top:10px; display:none;">
+    <div class="agent-list" id="custom-agent-list"></div>
+    <p id="custom-summary" style="color:var(--muted)"></p>
+  </div>
+
+  <details style="margin-top:10px;">
+    <summary>Add context (optional)</summary>
+    <textarea id="context" class="textarea" maxlength="2000" placeholder="Paste earnings transcript, article, or document..."></textarea>
+    <p id="context-count" style="color:var(--muted)">0 / 2000</p>
+    <textarea id="specific_questions" class="textarea" placeholder="Specific questions to answer..."></textarea>
+  </details>
+
+  <button id="run-btn" class="btn btn-primary" style="width:100%; margin-top:12px;">Run Research</button>
+  <p id="run-help" style="color:var(--muted)"></p>
+</section>
+
+<section class="card" style="margin-top:18px; padding:12px; overflow:hidden;">
+  <div id="ticker-strip" style="white-space:nowrap; overflow:auto;"></div>
+</section>

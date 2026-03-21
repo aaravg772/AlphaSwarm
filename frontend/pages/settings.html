@@ -1,0 +1,234 @@
+<div class="settings-layout">
+  <aside class="settings-sidebar card">
+    <h3>Settings</h3>
+    <a href="#" data-scroll="#section-ai-models">🤖 AI Models</a>
+    <a href="#" data-scroll="#section-research">📊 Research</a>
+    <a href="#" data-scroll="#section-social">💬 Social Sentiment</a>
+    <a href="#" data-scroll="#section-guard">🛡 Hallucination Guard</a>
+    <a href="#" data-scroll="#section-memo">📝 Memo & Output</a>
+    <a href="#" data-scroll="#section-caching">💾 Caching</a>
+    <a href="#" data-scroll="#section-budget">⚡ Budget & Limits</a>
+    <a href="#" data-scroll="#section-retry">🔁 Retry & Errors</a>
+    <a href="#" data-scroll="#section-keys">🔑 API Keys</a>
+    <a href="#" data-scroll="#section-system">🔧 System</a>
+  </aside>
+
+  <div class="settings-content">
+    <section class="card settings-toolbar">
+      <div>
+        <h2>AlphaSwarm Settings</h2>
+        <p class="muted">Every non-key setting is saved to <code>backend/alphaswarm_config.json</code>.</p>
+      </div>
+      <div class="settings-actions">
+        <span id="unsaved-indicator" class="tag hidden">Unsaved changes</span>
+        <button id="settings-save" class="btn btn-primary" disabled>Save Changes</button>
+        <button id="settings-reset" class="btn btn-outline">Reset to Defaults</button>
+      </div>
+    </section>
+
+    <section id="section-ai-models" class="card settings-section">
+      <h3>AI Models</h3>
+      <p class="muted">Configure which Groq models power each phase.</p>
+      <div class="settings-grid">
+        <label>Research Model (Phase 1)
+          <input class="input" data-cfg="research_model" type="text" />
+        </label>
+        <label>Cross-Examination Model (Phase 2)
+          <input class="input" data-cfg="cross_exam_model" type="text" />
+        </label>
+        <label>Synthesis Model (Phase 3)
+          <input class="input" data-cfg="synthesis_model" type="text" />
+        </label>
+        <label>Social Sentiment Model
+          <input class="input" data-cfg="social_model" type="text" />
+        </label>
+        <label>Research Fallback Model
+          <input class="input" data-cfg="research_fallback_model" type="text" />
+        </label>
+      </div>
+      <div class="settings-grid">
+        <label>Research Temperature <input class="input" data-cfg="research_temperature" type="number" min="0" max="1" step="0.05" /></label>
+        <label>Synthesis Temperature <input class="input" data-cfg="synthesis_temperature" type="number" min="0" max="1" step="0.05" /></label>
+        <label>Cross-Examination Temperature <input class="input" data-cfg="cross_exam_temperature" type="number" min="0" max="1" step="0.05" /></label>
+      </div>
+      <h4>Token Limits Per Call</h4>
+      <div class="settings-grid">
+        <label>Research Agent Max Tokens <input class="input" data-cfg="research_max_tokens" type="number" min="200" max="4000" /></label>
+        <label>Cross-Examination Max Tokens <input class="input" data-cfg="cross_exam_max_tokens" type="number" min="50" max="1000" /></label>
+        <label>Synthesis Max Tokens <input class="input" data-cfg="synthesis_max_tokens" type="number" min="500" max="8000" /></label>
+        <label>Social Sentiment Max Tokens <input class="input" data-cfg="social_max_tokens" type="number" min="200" max="2000" /></label>
+        <label>Connection Test Max Tokens <input class="input" data-cfg="connection_test_max_tokens" type="number" min="1" max="200" /></label>
+      </div>
+      <button id="test-models" class="btn btn-outline">Test Models</button>
+      <p id="test-models-result" class="muted"></p>
+    </section>
+
+    <section id="section-research" class="card settings-section">
+      <h3>Research Behavior</h3>
+      <div class="settings-grid">
+        <label>Default Research Depth
+          <select class="input" data-cfg="default_depth">
+            <option value="quick">Quick</option>
+            <option value="standard">Standard</option>
+            <option value="deep">Deep</option>
+          </select>
+        </label>
+        <label>Default Focus
+          <select class="input" data-cfg="default_focus">
+            <option value="all">All-around</option>
+            <option value="financial">Financial</option>
+            <option value="competitive">Competitive</option>
+            <option value="risk">Risk</option>
+            <option value="opportunity">Opportunity</option>
+          </select>
+        </label>
+        <label>Skip Cross-Exam for Quick <input data-cfg="skip_cross_exam_for_quick" type="checkbox" /></label>
+        <label>Max Cross-Exam Pairs <input class="input" data-cfg="max_cross_exam_pairs" type="number" min="0" max="15" /></label>
+        <label>Compound Searches Override <input class="input" data-cfg="compound_searches_override" type="number" min="-1" max="4" /></label>
+        <label>Default Compound Calls per Agent <input class="input" data-cfg="default_compound_calls_per_agent" type="number" min="0" max="4" /></label>
+      </div>
+      <div class="settings-grid">
+        <label>Quick Agents<textarea class="textarea" data-cfg="quick_agent_ids"></textarea></label>
+        <label>Standard Agents<textarea class="textarea" data-cfg="standard_agent_ids"></textarea></label>
+        <label>Deep Agents<textarea class="textarea" data-cfg="deep_agent_ids"></textarea></label>
+      </div>
+      <div class="settings-grid">
+        <label>Quick Compound Calls <input class="input" data-cfg="quick_compound_calls" type="number" min="1" max="100" /></label>
+        <label>Standard Compound Calls <input class="input" data-cfg="standard_compound_calls" type="number" min="1" max="200" /></label>
+        <label>Deep Compound Calls <input class="input" data-cfg="deep_compound_calls" type="number" min="1" max="300" /></label>
+      </div>
+      <div class="settings-grid">
+        <label>Phase 1 Enabled <input data-cfg="phase1_enabled" type="checkbox" /></label>
+        <label>Phase 2 Cross-Exam Enabled <input data-cfg="phase2_cross_exam_enabled" type="checkbox" /></label>
+        <label>Phase 3 Synthesis Enabled <input data-cfg="phase3_synthesis_enabled" type="checkbox" /></label>
+      </div>
+    </section>
+
+    <section id="section-social" class="card settings-section">
+      <h3>Social Sentiment Weighting</h3>
+      <p class="muted">Social sentiment is a secondary signal, typically affecting short-term variance.</p>
+      <div class="settings-grid">
+        <label>Social Synthesis Weight <input class="input" data-cfg="social_synthesis_weight" type="number" min="0" max="1" step="0.05" /></label>
+        <label>Max Score Adjustment from Social <input class="input" data-cfg="social_max_score_adjustment" type="number" min="0" max="2" step="0.1" /></label>
+        <label>Minimum Buzz Level to Influence Verdict
+          <select class="input" data-cfg="social_min_buzz_for_influence">
+            <option value="MINIMAL">MINIMAL</option>
+            <option value="LOW">LOW</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="HIGH">HIGH</option>
+          </select>
+        </label>
+        <label>Minimum Impact to Influence Verdict
+          <select class="input" data-cfg="social_min_impact_for_influence">
+            <option value="MINOR">MINOR</option>
+            <option value="MODERATE">MODERATE</option>
+            <option value="AMPLIFYING">AMPLIFYING</option>
+          </select>
+        </label>
+      </div>
+      <p id="social-preview" class="tag"></p>
+    </section>
+
+    <section id="section-guard" class="card settings-section">
+      <h3>Hallucination Guard</h3>
+      <div class="settings-grid">
+        <label>Enable Hallucination Guard <input data-cfg="hallucination_guard_enabled" type="checkbox" /></label>
+        <label>Minimum Sources for Low Risk <input class="input" data-cfg="min_sources_for_low_risk" type="number" min="0" max="10" /></label>
+        <label>Medium Risk Claim Threshold <input class="input" data-cfg="medium_risk_claim_threshold" type="number" min="1" max="10" /></label>
+        <label>High Risk Claim Threshold <input class="input" data-cfg="high_risk_claim_threshold" type="number" min="2" max="20" /></label>
+        <label>Block HIGH Risk Findings <input data-cfg="block_high_risk_findings" type="checkbox" /></label>
+        <label>Prefix MEDIUM Risk Findings <input data-cfg="prefix_medium_risk_findings" type="checkbox" /></label>
+        <label>Fail Agent on Zero Sources <input data-cfg="fail_on_zero_sources" type="checkbox" /></label>
+        <label>Enable Memo Validation <input data-cfg="memo_validation_enabled" type="checkbox" /></label>
+      </div>
+    </section>
+
+    <section id="section-memo" class="card settings-section">
+      <h3>Memo & Output</h3>
+      <div class="settings-grid">
+        <label>Key Findings Count <input class="input" data-cfg="memo_key_findings_count" type="number" min="3" max="10" /></label>
+        <label>Bull Thesis Points <input class="input" data-cfg="memo_bull_thesis_count" type="number" min="1" max="7" /></label>
+        <label>Bear Thesis Points <input class="input" data-cfg="memo_bear_thesis_count" type="number" min="1" max="7" /></label>
+        <label>Key Risks Count <input class="input" data-cfg="memo_key_risks_count" type="number" min="1" max="7" /></label>
+        <label>Catalysts Count <input class="input" data-cfg="memo_catalysts_count" type="number" min="1" max="7" /></label>
+        <label>Summary Max Words <input class="input" data-cfg="memo_summary_max_words" type="number" min="30" max="200" /></label>
+        <label>Final Prediction Max Words <input class="input" data-cfg="memo_prediction_max_words" type="number" min="20" max="100" /></label>
+        <label>Include Social Signal in Memo <input data-cfg="memo_include_social_signal" type="checkbox" /></label>
+        <label>Max Findings Chars for Synthesis <input class="input" data-cfg="max_findings_chars_synthesis" type="number" min="200" max="2000" /></label>
+        <label>Max Cross-Exam Chars <input class="input" data-cfg="max_cross_exam_chars" type="number" min="100" max="4000" /></label>
+        <label>Max User Context Chars <input class="input" data-cfg="max_context_chars" type="number" min="500" max="5000" /></label>
+        <label>Strip Markdown for Synthesis <input data-cfg="strip_markdown_for_synthesis" type="checkbox" /></label>
+      </div>
+    </section>
+
+    <section id="section-caching" class="card settings-section">
+      <h3>Query Caching</h3>
+      <p id="cache-count" class="muted">Cache currently holds 0 entries.</p>
+      <div class="settings-grid">
+        <label>Enable Query Cache <input data-cfg="cache_enabled" type="checkbox" /></label>
+        <label>Cache TTL (hours) <input class="input" data-cfg="cache_ttl_hours" type="number" min="1" max="72" /></label>
+        <label>Max Cache Entries <input class="input" data-cfg="cache_max_entries" type="number" min="50" max="1000" /></label>
+        <label>Persist Cache to Disk <input data-cfg="cache_persist_to_disk" type="checkbox" /></label>
+      </div>
+      <button id="clear-cache" class="btn btn-outline">Clear Cache Now</button>
+    </section>
+
+    <section id="section-budget" class="card settings-section">
+      <h3>Daily Budget Management</h3>
+      <div class="budget-gauge-wrap">
+        <p id="budget-gauge-text">Today: 0 / 0 compound calls used</p>
+        <div class="progress"><div id="budget-gauge-bar" style="width:0%"></div></div>
+        <p id="budget-reset-timer" class="muted"></p>
+      </div>
+      <div class="settings-grid">
+        <label>Daily Compound Limit <input class="input" data-cfg="daily_compound_limit" type="number" min="10" max="1000" /></label>
+        <label>Budget Warning Threshold <input class="input" data-cfg="budget_warning_threshold" type="number" min="5" max="200" /></label>
+        <label>Budget Hard Floor <input class="input" data-cfg="budget_hard_floor" type="number" min="0" max="50" /></label>
+      </div>
+      <button id="reset-budget" class="btn btn-outline">Reset Today's Budget Counter</button>
+    </section>
+
+    <section id="section-retry" class="card settings-section">
+      <h3>Retry & Error Handling</h3>
+      <div class="settings-grid">
+        <label>Max Retries on 429 <input class="input" data-cfg="max_retries_on_429" type="number" min="0" max="5" /></label>
+        <label>Retry Delay Buffer (seconds) <input class="input" data-cfg="retry_delay_buffer_seconds" type="number" min="0" max="30" step="0.5" /></label>
+        <label>Synthesis Max Retries <input class="input" data-cfg="synthesis_max_retries" type="number" min="1" max="5" /></label>
+        <label>Continue on Agent Failure <input data-cfg="continue_on_agent_failure" type="checkbox" /></label>
+      </div>
+    </section>
+
+    <section id="section-keys" class="card settings-section">
+      <h3>API Keys</h3>
+      <p class="muted">API keys are loaded from <code>.env</code> and never saved to config JSON.</p>
+      <div class="settings-grid">
+        <div>
+          <b>Groq API Key</b>
+          <p id="groq-key-status" class="muted">Loading...</p>
+        </div>
+        <div>
+          <b>Compound Model Status</b>
+          <p id="compound-status" class="muted">Unknown</p>
+        </div>
+        <div>
+          <b>Instant Model Status</b>
+          <p id="instant-status" class="muted">Unknown</p>
+        </div>
+      </div>
+      <button id="provider-refresh" class="btn btn-outline">Refresh Provider Status</button>
+    </section>
+
+    <section id="section-system" class="card settings-section">
+      <h3>System</h3>
+      <div class="settings-grid">
+        <label>Port <input class="input" data-cfg="port" type="number" min="1024" max="65535" /></label>
+        <label>Verbose Logging <input data-cfg="verbose_logging" type="checkbox" /></label>
+      </div>
+      <div class="settings-actions">
+        <button id="export-config" class="btn btn-outline">Export Config</button>
+        <button id="import-config-btn" class="btn btn-outline">Import Config</button>
+        <input id="import-config-input" type="file" accept="application/json" class="hidden" />
+      </div>
+    </section>
+  </div>
+</div>

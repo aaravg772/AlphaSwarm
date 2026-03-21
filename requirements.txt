@@ -1,0 +1,15 @@
+fastapi==0.135.1
+uvicorn==0.34.0
+groq==0.18.0
+python-dotenv==1.0.1
+weasyprint==65.1
+pydantic==2.11.0
+python-multipart==0.0.20
+httpx==0.28.1
+yfinance==0.2.52
+pandas==3
+numpy==2.2.6
+requests==2.32.3
+reportlab==4.4.10
+pandas-ta==0.4.67b0
+scipy==1.15.2

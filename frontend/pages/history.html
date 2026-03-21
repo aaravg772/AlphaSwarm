@@ -1,0 +1,25 @@
+<section class="card" style="padding:14px;">
+  <div class="row" style="flex-wrap:wrap;">
+    <input id="history-search" class="input" placeholder="Search by company name" style="max-width:240px;" />
+    <select id="history-verdict" style="max-width:170px;">
+      <option value="">All verdicts</option>
+      <option>BULLISH</option>
+      <option>BEARISH</option>
+      <option>NEUTRAL</option>
+    </select>
+    <input id="history-date-from" class="input" type="date" style="max-width:170px;" />
+    <input id="history-date-to" class="input" type="date" style="max-width:170px;" />
+  </div>
+  <p id="history-stats" style="color:var(--muted);"></p>
+</section>
+
+<section class="card" style="padding:14px; margin-top:10px; overflow:auto;">
+  <table class="metric-table" style="min-width:900px;">
+    <thead>
+      <tr>
+        <th>Target</th><th>Date</th><th>Depth</th><th>Verdict</th><th>Score</th><th>Agents</th><th>Calls Used</th><th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="history-body"></tbody>
+  </table>
+</section>

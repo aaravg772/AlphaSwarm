@@ -59,7 +59,7 @@ graph TD
 
     RM --> R1["Phase 1: Multi-Agent Search"]
     R1 --> GROQ
-    RM --> R2["Phase 2: Technical TA public-only"]
+    RM --> R2[S2]
     R2 --> YF
     RM --> R3["Phase 3: Cross-Exam"]
     R3 --> GROQ["Groq AI Cloud"]

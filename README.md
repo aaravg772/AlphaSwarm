@@ -53,7 +53,6 @@ graph TD
     SM --> S2["Phase 2: Technical TA (public companies only)"]
     S2 --> YF["yFinance API"]
     SM --> S3["Phase 3: Cross-Exam"]
-    S3 --> GROQ
     SM --> S4["Phase 4: Synthesis and Verdict"]
     S4 --> SPDF["Standard PDF Export"]
 
@@ -62,7 +61,6 @@ graph TD
     RM --> R2["Phase 2: Technical TA (public companies only)"]
     R2 --> YF
     RM --> R3["Phase 3: Cross-Exam"]
-    R3 --> GROQ
     RM --> R4["Phase 4: Dossier Formatting"]
     R4 --> RPDF["Research PDF Export"]
 ```

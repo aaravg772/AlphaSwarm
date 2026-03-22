@@ -50,20 +50,20 @@ graph TD
 
     SM --> S1["Phase 1: Multi-Agent Search"]
     S1 --> GROQ["Groq AI Cloud"]
-    SM --> S2["Phase 2: Technical TA public-only"]
+    SM --> S2["Phase 2: Technical TA (public companies only)"]
     S2 --> YF["yFinance API"]
     SM --> S3["Phase 3: Cross-Exam"]
-    S3 --> GROQ["Groq AI Cloud"]
+    S3 --> GROQ
     SM --> S4["Phase 4: Synthesis and Verdict"]
     S4 --> SPDF["Standard PDF Export"]
 
     RM --> R1["Phase 1: Multi-Agent Search"]
     R1 --> GROQ
-    RM --> R2[S2]
+    RM --> R2["Phase 2: Technical TA (public companies only)"]
     R2 --> YF
     RM --> R3["Phase 3: Cross-Exam"]
-    R3 --> GROQ["Groq AI Cloud"]
-    RM --> R4["Phase 4: Dossier Formatting no verdict"]
+    R3 --> GROQ
+    RM --> R4["Phase 4: Dossier Formatting"]
     R4 --> RPDF["Research PDF Export"]
 ```
 
